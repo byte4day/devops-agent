@@ -28,7 +28,7 @@ Commands are **argument arrays**, not shell lines. Write `[npm, run, build]`, no
 | `default_environment` | `preview` | `preview`, `staging`, or `production`. |
 | `allowed_targets` | all three environments | Local planning allowlist; it does not grant deployment approval. |
 | `test_commands`, `build_commands` | detected commands | Lists of executable argument arrays. |
-| `health_urls` | empty | Absolute HTTP(S) endpoints to check after deployment. |
+| `health_urls` | empty | Absolute HTTP(S) application endpoints checked for production; preview verification uses the observed preview URL. |
 | `max_repair_attempts` | `3` | Bound for agent-guided repair attempts; accepted range is 0–3. |
 | `command_timeout` | `300` | External command timeout in seconds; accepted range is 1–1800. |
 | `approval_policy.require_production_approval` | `true` | Local policy hint. Explicit target-bound authorization is still required for production mutation. |

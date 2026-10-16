@@ -20,6 +20,7 @@ class DeploymentPlan:
     build: tuple[CommandSpec, ...]
     deploy: tuple[CommandSpec, ...]
     health_urls: tuple[str, ...]
+    application_health_required: bool
     warnings: tuple[str, ...]
 
     def to_dict(self) -> dict[str, object]:
@@ -109,10 +110,13 @@ def make_plan(
     if not deploy or any(not step.mutating for step in deploy):
         raise UnsupportedOperation("Provider returned no executable deployment steps")
     warnings = ["Production requires target-bound approval"] if environment == "production" else []
-    if not config.health_urls:
-        warnings.append(
-            "No health URL configured; deployment result will remain UNVERIFIED unless the provider returns a URL"
-        )
+    app_health_required = project.api_routes or bool(project.database_dependencies)
+    if app_health_required and not config.health_urls:
+        warnings.append("API or database health requires a configured application health URL")
+    elif not config.health_urls:
+        warnings.append("No health URL configured; release will be UNVERIFIED unless the provider returns a URL")
+    if app_health_required and environment != "production":
+        warnings.append("Preview application health needs a release-specific health URL")
     return DeploymentPlan(
         project.name,
         status.name,
@@ -122,6 +126,7 @@ def make_plan(
         tuple(build),
         deploy,
         config.health_urls,
+        app_health_required,
         tuple(warnings),
     )
 

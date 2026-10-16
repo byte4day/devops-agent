@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from devops_agent.core.diagnostics import classify
 from devops_agent.core.executor import execute
 from devops_agent.core.planner import choose_provider, make_plan
 from devops_agent.core.security import SubprocessRunner, redact
+from devops_agent.core.verifier import Check, Verification
 from devops_agent.providers import aws
 from devops_agent.providers.base import CommandSpec, OperationResult, ProviderStatus
 
@@ -185,3 +187,24 @@ def test_aws_plan_reads_validated_config_without_optional_prefix(tmp_path: Path)
     plan = make_plan(project, load_config(tmp_path), aws.Provider(), status, "production")
     assert "--delete" not in plan.deploy[0].argv
     assert plan.preflight[0].argv[:3] == ["aws", "s3api", "head-bucket"]
+
+
+def test_api_app_needs_application_health_even_when_homepage_responds(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "package.json").write_text(json.dumps({"dependencies": {"next": "15"}}))
+    (tmp_path / "app/api").mkdir(parents=True)
+    project = analyze(tmp_path)
+    status = ProviderStatus("fake", "fake", True, "1", True, "acct")
+    plan = make_plan(project, load_config(tmp_path), FakeProvider(), status, "preview")
+
+    class UrlProvider(FakeProvider):
+        def parse_deployment(self, result):
+            return replace(result, url="https://preview.example.com")
+
+    monkeypatch.setattr(
+        "devops_agent.core.executor.verify",
+        lambda url: Verification(url, (Check("http", "PASSED", "HTTP 200"),), "HEALTHY"),
+    )
+    report = execute(plan, UrlProvider(), status, FakeRunner(tmp_path))
+    assert report.phases["health"] == "PASSED"
+    assert report.phases["application_health"] == "NOT_TESTED"
+    assert report.verdict == "UNVERIFIED"

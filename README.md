@@ -167,6 +167,8 @@ The package rejects an incompatible runtime instead of uploading a server-render
 
 For a public URL, the deterministic verifier checks DNS resolution, TLS certificate negotiation, HTTP response and redirect outcome, up to three same-origin script/style assets, and whether CSP or `X-Content-Type-Options` was observed. It does not authenticate into private pages, run a browser, test all routes, prove database health, or measure Core Web Vitals. Those checks should be performed separately when relevant and marked **not tested** until executed.
 
+For projects with API routes or database dependencies, a reachable home page alone leaves the release `UNVERIFIED`. A configured application health URL is checked for production; preview needs its own release-specific health check before it can be treated as verified. The health endpoint must actually exercise the dependency you want to validate.
+
 | Verdict | Meaning |
 | --- | --- |
 | `HEALTHY` | Executed required checks passed for the observed target. |

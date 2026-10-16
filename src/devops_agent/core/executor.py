@@ -91,6 +91,7 @@ def execute(
         "build": "NOT_TESTED",
         "deployment": "NOT_TESTED",
         "health": "NOT_TESTED",
+        "application_health": "NOT_TESTED",
     }
     warnings = list(plan.warnings)
     url: str | None = None
@@ -157,6 +158,15 @@ def execute(
             if any(item.verdict == "DEGRADED" for item in checks)
             else "PASSED"
         )
+        if plan.application_health_required and plan.environment == "production" and plan.health_urls:
+            configured = checks[-len(plan.health_urls) :]
+            phases["application_health"] = (
+                "FAILED"
+                if any(item.verdict == "FAILED" for item in configured)
+                else "DEGRADED"
+                if any(item.verdict == "DEGRADED" for item in configured)
+                else "PASSED"
+            )
     else:
         warnings.append("No release-specific deployment URL was available for verification")
     verdict = (
@@ -168,6 +178,8 @@ def execute(
         if phases["health"] == "PASSED"
         else "UNVERIFIED"
     )
+    if plan.application_health_required and phases["application_health"] == "NOT_TESTED" and verdict != "FAILED":
+        verdict = "UNVERIFIED"
     audit.write(
         "release_verdict",
         provider=plan.provider,
