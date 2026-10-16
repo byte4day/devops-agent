@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a concrete provider or workflow capability.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Operational use case
+      description: What operation should the agent perform, and for which provider or platform?
+    validations:
+      required: true
+  - type: textarea
+    id: provider_contract
+    attributes:
+      label: Provider behavior and official documentation
+      description: Link the documented CLI or API behavior and explain any approval or rollback implications.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workaround
+    validations:
+      required: false

@@ -1,0 +1,9 @@
+# Deployment workflow
+
+Run from the application repository. Use `doctor` to identify available tools and auth, `analyze` to inspect its runtime and services, then `plan` for a provider and target. Verify the proposed account, project, region, cost implications, and whether infrastructure is managed by IaC. Existing production hosting is a strong constraint; a provider migration needs its own authorization.
+
+Perform non-mutating preflight and provider-native plan mechanisms when available. Run relevant repository tests and build commands. For preview or staging, deploy only when that environment and operations are authorized, then verify the returned URL, logs, HTTP status, and key routes. A zero exit code alone is insufficient.
+
+Production deployment needs a concrete plan, target, and specific authorization unless standing authorization already covers it. Validate preview first when the provider and application support a preview stage. After production deployment, run `verify` against the actual URL and inspect runtime logs. If validation fails, report FAILED or DEGRADED and follow the bounded repair/recovery policy. Never silently roll back production.
+
+Use `scripts/devops.py --help` to inspect current CLI flags. The script is invoked with `python /absolute/path/to/skill/scripts/devops.py <command> ...`; it forwards arguments as an array to the packaged CLI. It does not run shell fragments. `plan --provider NAME --environment TARGET --dry-run` runs read-only preflight; native mutation dry-run is unavailable unless the provider reports it. `deploy TARGET --provider NAME --account ID --approve PHRASE` executes after authorization; `PHRASE` must match the exact target-bound phrase in the plan. The tool will reject unauthenticated providers and active account drift.

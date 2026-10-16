@@ -1,0 +1,15 @@
+# Copy only settings you need to your project's devops.yaml.
+provider: vercel
+project_name: example-web
+default_environment: preview
+allowed_targets: [preview, staging, production]
+test_commands:
+  - [npm, run, test]
+build_commands:
+  - [npm, run, build]
+health_urls:
+  - https://example.invalid/health
+max_repair_attempts: 3
+command_timeout: 300
+approval_policy:
+  require_production_approval: true

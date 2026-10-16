@@ -1,0 +1,42 @@
+name: Bug report
+description: Report reproducible behavior in the local package or skill.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Remove tokens, account IDs, private URLs, and secret values from all output before submitting. Use the Security tab for vulnerabilities."
+  - type: input
+    id: version
+    attributes:
+      label: DevOps Agent version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Python, OS, and AI coding platform
+      placeholder: "Python 3.12, Ubuntu 24.04, Codex CLI"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact DevOps Agent command and a minimal safe project example.
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed result
+      description: Include redacted error output and the exit status.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true

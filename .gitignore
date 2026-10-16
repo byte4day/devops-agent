@@ -1,0 +1,35 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.venv/
+venv/
+
+# Local credentials and provider state
+.env
+.env.*
+!.env.example
+.aws/
+.azure/
+.config/gcloud/
+.wrangler/
+.vercel/
+.netlify/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+
+# Editor, operating system, and local inspection artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.copycat/
+.devops-agent/

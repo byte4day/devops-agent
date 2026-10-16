@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 96" role="img" aria-labelledby="title desc">
+  <title id="title">DevOps Agent</title>
+  <desc id="desc">A connected infrastructure mark beside the DevOps Agent wordmark.</desc>
+  <rect width="460" height="96" rx="14" fill="#101114"/>
+  <g transform="translate(16 16)">
+    <path d="M22 19v26m0-13h19" fill="none" stroke="#93979F" stroke-width="3" stroke-linecap="square"/>
+    <rect x="15" y="12" width="14" height="14" rx="2" fill="#F3F3F1"/>
+    <rect x="15" y="38" width="14" height="14" rx="2" fill="#F3F3F1"/>
+    <rect x="36" y="25" width="14" height="14" rx="2" fill="#71A894"/>
+  </g>
+  <text x="100" y="61" fill="#F3F3F1" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" letter-spacing="-1.3">DevOps <tspan fill="#71A894">Agent</tspan></text>
+</svg>

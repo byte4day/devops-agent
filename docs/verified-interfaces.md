@@ -1,0 +1,20 @@
+# Verified external interfaces
+
+The implementation was checked against the following official documentation while preparing the initial source release on 2026-10-16. Provider CLI behavior can differ by installed version; `devops-agent doctor` reports local versions and the adapter must reject unsupported operations. This list records the documented command surfaces, not evidence of a live cloud deployment.
+
+| Integration | Authoritative documentation used |
+| --- | --- |
+| Agent Skills | [Agent Skills specification](https://agentskills.io/specification) |
+| OpenAI Codex CLI and IDE | [Build skills: discovery paths and `$` or `/skills` invocation](https://learn.chatgpt.com/docs/build-skills) |
+| Claude Code | [Skills](https://code.claude.com/docs/en/skills) |
+| Cursor | [Skills](https://cursor.com/docs/skills) |
+| Google Antigravity | [Skills](https://antigravity.google/docs/skills), [workspace/global paths and slash invocation](https://www.antigravity.google/docs/migration/workflows-to-skills/) |
+| Cloudflare Wrangler | [General commands and `whoami --json`](https://developers.cloudflare.com/workers/wrangler/commands/general/), [Worker deploy, strict mode, versions](https://developers.cloudflare.com/workers/wrangler/commands/workers/), [Pages deploy and deployment listing](https://developers.cloudflare.com/workers/wrangler/commands/pages/) |
+| AWS CLI | [IAM Identity Center sign-in](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html), [S3 sync](https://docs.aws.amazon.com/cli/latest/reference/s3/sync.html), [S3 bucket owner check](https://docs.aws.amazon.com/cli/latest/reference/s3api/head-bucket.html), [CloudFormation validate-template](https://docs.aws.amazon.com/cli/latest/reference/cloudformation/validate-template.html) |
+| Alibaba Cloud CLI and OSS | [Credential configuration](https://www.alibabacloud.com/help/en/cli/configure-credentials/), [ossutil recursive upload](https://www.alibabacloud.com/help/en/oss/developer-reference/upload-objects-6) |
+| Vercel CLI | [CLI commands](https://vercel.com/docs/cli), [deployment from CLI](https://vercel.com/docs/cli/deploying-from-cli), [inspection](https://vercel.com/docs/cli/inspect), [rollback](https://vercel.com/docs/cli/rollback) |
+| Netlify CLI and API | [CLI getting started and draft/production deploys](https://docs.netlify.com/api-and-cli-guides/cli-guides/get-started-with-cli/), [OpenAPI restoreSiteDeploy](https://open-api.netlify.com/) |
+| GitHub CLI | [Authentication status and JSON behavior](https://cli.github.com/manual/gh_auth_status), [workflow run inspection](https://cli.github.com/manual/gh_run_view) |
+| GitHub Actions | [Building and testing Python](https://docs.github.com/en/actions/tutorials/build-and-test-code/python), [workflow token permissions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication) |
+
+The GitHub Actions workflows pin `actions/checkout` and `actions/setup-python` to commit hashes resolved from their official Git repositories at the time of writing. Version comments in the YAML are descriptive; the commit hashes determine what runs.
