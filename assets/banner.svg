@@ -1,15 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 280" role="img" aria-labelledby="title desc">
   <title id="title">DevOps Agent</title>
-  <desc id="desc">DevOps Agent brand banner: deploy, debug, and operate applications from an AI coding assistant.</desc>
-  <rect width="1200" height="280" rx="20" fill="#101114"/>
-  <path d="M48 218h1104" stroke="#32363B" stroke-width="2"/>
-  <g transform="translate(54 67) scale(1.9)">
-    <path d="M22 19v26m0-13h19" fill="none" stroke="#93979F" stroke-width="2" stroke-linecap="square"/>
-    <rect x="15" y="12" width="14" height="14" rx="2" fill="#F3F3F1"/>
-    <rect x="15" y="38" width="14" height="14" rx="2" fill="#F3F3F1"/>
-    <rect x="36" y="25" width="14" height="14" rx="2" fill="#71A894"/>
+  <desc id="desc">DevOps Agent banner showing a deployment bridge and a three-stage operations path.</desc>
+  <rect width="1200" height="280" rx="18" fill="#101114"/>
+  <g transform="translate(57 65) scale(1.45)">
+    <path d="M26 16H16v32h10M38 16h10v32H38" fill="none" stroke="#F3F3F1" stroke-width="4" stroke-linecap="square" stroke-linejoin="miter"/>
+    <path d="M25 32h14" fill="none" stroke="#71A894" stroke-width="4" stroke-linecap="square"/>
   </g>
-  <text x="205" y="140" fill="#F3F3F1" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="700" letter-spacing="-2.5">DevOps <tspan fill="#71A894">Agent</tspan></text>
-  <text x="209" y="180" fill="#93979F" font-family="Arial, Helvetica, sans-serif" font-size="20" letter-spacing="0.2">Deploy · debug · operate</text>
-  <text x="55" y="249" fill="#93979F" font-family="Arial, Helvetica, sans-serif" font-size="13" letter-spacing="1.5">AN OPEN SOURCE AGENT SKILL</text>
+  <text x="163" y="132" fill="#F3F3F1" font-family="Arial, Helvetica, sans-serif" font-size="62" font-weight="700" letter-spacing="-2.4">DevOps <tspan fill="#93979F">Agent</tspan></text>
+  <text x="166" y="173" fill="#93979F" font-family="Arial, Helvetica, sans-serif" font-size="20">Deploy, debug, and operate from your AI coding assistant.</text>
+  <path d="M786 122h302" fill="none" stroke="#42474D" stroke-width="2"/>
+  <rect x="778" y="114" width="16" height="16" fill="#101114" stroke="#93979F" stroke-width="2"/>
+  <rect x="929" y="114" width="16" height="16" fill="#101114" stroke="#F3F3F1" stroke-width="2"/>
+  <rect x="1080" y="114" width="16" height="16" fill="#71A894"/>
+  <g fill="#93979F" font-family="Arial, Helvetica, sans-serif" font-size="13" letter-spacing="1.2">
+    <text x="778" y="158">INSPECT</text>
+    <text x="929" y="158">DEPLOY</text>
+    <text x="1061" y="158">VERIFY</text>
+  </g>
+  <path d="M57 220h1086" fill="none" stroke="#34383D" stroke-width="1"/>
+  <text x="58" y="249" fill="#93979F" font-family="Arial, Helvetica, sans-serif" font-size="13" letter-spacing="1.5">OPEN SOURCE · AGENT SKILL</text>
 </svg>
