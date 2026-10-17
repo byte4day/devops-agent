@@ -105,12 +105,22 @@ def _run_checked(argv: list[str], timeout: int = 300) -> None:
         raise RuntimeError(f"Command failed ({process.returncode}): {argv[0]}: {detail}")
 
 
-def _backup_path(path: Path) -> Path:
+def _backup_path(path: Path, *, skill: bool = False) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    candidate = path.with_name(f"{path.name}.backup-{stamp}")
+    if skill:
+        folder = _data_root() / "backups"
+        if folder.is_symlink():
+            raise RuntimeError(f"Refusing symlinked backup directory: {folder}")
+        folder.mkdir(parents=True, exist_ok=True)
+        prefix = hashlib.sha256(str(path).encode()).hexdigest()[:12]
+        base_name = f"{prefix}-{path.name}.backup-{stamp}"
+    else:
+        folder = path.parent
+        base_name = f"{path.name}.backup-{stamp}"
+    candidate = folder / base_name
     index = 1
     while candidate.exists() or candidate.is_symlink():
-        candidate = path.with_name(f"{path.name}.backup-{stamp}-{index}")
+        candidate = folder / f"{base_name}-{index}"
         index += 1
     return candidate
 
@@ -174,7 +184,7 @@ def _install_skill(target: Path, platforms: list[str], project: Path | None, run
         }
         (staging / MARKER).write_text(json.dumps(marker, indent=2) + "\n", encoding="utf-8")
         if existing:
-            backup = _backup_path(target)
+            backup = _backup_path(target, skill=True)
             target.rename(backup)
         staging.rename(target)
         return f"Installed: {target}"
@@ -247,7 +257,7 @@ def _consolidate_cursor(project: Path | None) -> None:
         return
     if _read_marker(shared) is None or _read_marker(native) is None:
         raise RuntimeError("Cannot consolidate an unmanaged Cursor skill")
-    backup = _backup_path(native)
+    backup = _backup_path(native, skill=True)
     native.rename(backup)
     marker = _read_marker(shared)
     assert marker is not None

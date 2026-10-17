@@ -130,7 +130,7 @@ def verify(url: str, *, allow_private: bool = False, timeout: int = 10) -> Verif
         checks.append(
             Check(
                 "https",
-                "PASSED" if urlparse(final_url).scheme == "https" else "NOT_TESTED",
+                "PASSED" if urlparse(final_url).scheme == "https" else "DEGRADED",
                 f"TLS {tls}; certificate expires {expiry}" if tls else "Final URL uses HTTP",
             )
         )

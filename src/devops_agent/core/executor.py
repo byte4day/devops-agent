@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from devops_agent.core.approvals import ApprovalScope, require_approval
+from devops_agent.core.artifacts import validate_artifact_tree
 from devops_agent.core.diagnostics import Diagnostic, classify
 from devops_agent.core.planner import DeploymentPlan
 from devops_agent.core.security import SubprocessRunner, redact
@@ -73,6 +74,8 @@ def execute(
     *,
     approve: str | None = None,
     expected_account: str | None = None,
+    incident: str | None = None,
+    max_repair_attempts: int = 3,
 ) -> DeploymentReport:
     if status.name != plan.provider or not status.authenticated or not status.installed:
         raise PermissionError("Provider identity or authentication changed since planning")
@@ -83,7 +86,13 @@ def execute(
             f"Active account {status.account!r} does not match requested account {expected_account!r}"
         )
     if plan.environment == "production" or plan.provider == "aws":
-        require_approval(ApprovalScope("deploy", plan.provider, plan.project, plan.environment), approve)
+        require_approval(
+            ApprovalScope("deploy", plan.provider, plan.approval_target or plan.project, plan.environment), approve
+        )
+    if incident is not None:
+        from devops_agent.core.incidents import IncidentLedger, candidate_fingerprint
+
+        IncidentLedger(runner.cwd).reserve(incident, candidate_fingerprint(runner.cwd), max_repair_attempts)
     audit = AuditLog(runner.cwd)
     phases = {
         "preflight": "NOT_TESTED",
@@ -96,7 +105,28 @@ def execute(
     warnings = list(plan.warnings)
     url: str | None = None
     release: str | None = None
+    artifact_checked = False
     for spec in (*plan.preflight, *plan.build, *plan.deploy):
+        if spec.mutating and plan.artifact_output_dir and not artifact_checked:
+            try:
+                summary = validate_artifact_tree(runner.cwd, plan.artifact_output_dir)
+                audit.write("artifact_validated", provider=plan.provider, project=plan.project, **summary)
+                artifact_checked = True
+            except ValueError as exc:
+                phases["deployment"] = "FAILED"
+                return DeploymentReport(
+                    plan.project,
+                    plan.environment,
+                    plan.provider,
+                    status.account,
+                    phases,
+                    release,
+                    url,
+                    "FAILED",
+                    classify(str(exc), 1),
+                    (),
+                    tuple(warnings + [str(exc)]),
+                )
         phase = (
             "deployment"
             if spec.mutating

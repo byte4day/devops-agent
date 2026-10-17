@@ -5,6 +5,7 @@
 ```yaml
 provider: vercel
 project_name: example-web
+# output_dir: dist
 default_environment: preview
 allowed_targets: [preview, staging, production]
 test_commands:
@@ -25,17 +26,19 @@ Commands are **argument arrays**, not shell lines. Write `[npm, run, build]`, no
 | --- | --- | --- |
 | `provider` | auto selection when unambiguous | Preferred provider name. An explicit CLI selection takes precedence. |
 | `project_name` | detected name | Label for reports. |
+| `output_dir` | framework-detected directory | Dedicated relative static artifact directory. The repository root is refused; upload checks reject symlinks and obvious credential files. |
 | `default_environment` | `preview` | `preview`, `staging`, or `production`. |
 | `allowed_targets` | all three environments | Local planning allowlist; it does not grant deployment approval. |
 | `test_commands`, `build_commands` | detected commands | Lists of executable argument arrays. |
 | `health_urls` | empty | Absolute HTTP(S) application endpoints checked for production; preview verification uses the observed preview URL. |
-| `max_repair_attempts` | `3` | Bound for agent-guided repair attempts; accepted range is 0–3. |
+| `max_repair_attempts` | `3` | Enforced per incident when `deploy --incident ID` is used; accepted range is 0–3. The same Git candidate cannot be deployed twice for one incident. |
 | `command_timeout` | `300` | External command timeout in seconds; accepted range is 1–1800. |
 | `approval_policy.require_production_approval` | `true` | Local policy hint. Explicit target-bound authorization is still required for production mutation. |
 | `aws_bucket`, `aws_prefix`, `aws_region`, `aws_account_id` | unset | Existing S3 bucket target, isolated preview/staging prefix, region, and expected 12-digit bucket owner account. AWS upload still requires target-bound approval. |
+| `cloudformation_template`, `cloudformation_stack` | unset | Project-local template and existing stack for the separate reviewed `infra` workflow. Explicit AWS region and account ID are also required. |
 | `oss_bucket`, `oss_prefix` | unset | Existing Alibaba OSS bucket and optional isolated key prefix. Preview/staging requires a prefix. |
 | `production_branch`, `preview_branch` | unset | Cloudflare Pages branch names. Production requires an explicit branch that matches the remote project. |
 
-The configuration cannot make a platform compatible with an unsupported runtime. For example, a static artifact upload cannot host a server-rendered application or an API process. Provider-specific configuration, such as a linked Vercel project or a Wrangler project file, remains necessary where the adapter requires it. The AWS adapter uploads static output to an existing S3 bucket; its CloudFormation support is read-only validation and event inspection. The Alibaba adapter uploads static output to an existing OSS bucket when `ossutil` is installed.
+The configuration cannot make a platform compatible with an unsupported runtime. For example, a static artifact upload cannot host a server-rendered application or an API process. A root-level static HTML site needs a separately prepared artifact directory before uploading; the tool will not upload the whole repository. Provider-specific configuration, such as a linked Vercel project or a Wrangler project file, remains necessary where the adapter requires it. The AWS adapter uploads static output to an existing S3 bucket and supports a separate reviewed CloudFormation UPDATE change-set path. The Alibaba adapter uploads static output to an existing OSS bucket when `ossutil` is installed.
 
 Do not commit `.env` files, access keys, session cookies, private certificate keys, or provider credential stores. Store deployment secrets using your provider's secret management mechanism and reference only environment variable **names** in source control.

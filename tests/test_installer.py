@@ -77,7 +77,8 @@ def test_global_install_and_idempotent_reinstall(isolated: tuple[Path, Path]) ->
     assert installer.main(["--platform", "claude", "--global"]) == 0
     assert not list(target.parent.glob("devops.backup-*"))
     assert installer.main(["--platform", "claude", "--global", "--update"]) == 0
-    assert len(list(target.parent.glob("devops.backup-*"))) == 1
+    assert not list(target.parent.glob("devops.backup-*"))
+    assert len(list((installer._data_root() / "backups").glob("*-devops.backup-*"))) == 1
 
 
 def test_uninstall_cleans_only_managed_paths(isolated: tuple[Path, Path]) -> None:
@@ -145,7 +146,8 @@ def test_all_install_consolidates_existing_cursor_copy(isolated: tuple[Path, Pat
     assert installer.main(["--all"]) == 0
     assert project.joinpath(".agents/skills/devops/SKILL.md").is_file()
     assert not project.joinpath(".cursor/skills/devops").exists()
-    assert list(project.joinpath(".cursor/skills").glob("devops.backup-*"))
+    assert not list(project.joinpath(".cursor/skills").glob("devops.backup-*"))
+    assert list((installer._data_root() / "backups").glob("*-devops.backup-*"))
     marker = json.loads(project.joinpath(".agents/skills/devops", installer.MARKER).read_text(encoding="utf-8"))
     assert "cursor" in marker["platforms"]
 

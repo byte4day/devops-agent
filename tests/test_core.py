@@ -80,6 +80,14 @@ def test_config_rejects_unsafe_commands_and_production_bypass(tmp_path: Path) ->
     (tmp_path / "devops.yaml").write_text("build_commands:\n  - [tool, '--password', secret-value]\n")
     with pytest.raises(ValueError, match="credential arguments"):
         load_config(tmp_path)
+    (tmp_path / "devops.yaml").write_text("output_dir: ../private\n")
+    with pytest.raises(ValueError, match="safe relative"):
+        load_config(tmp_path)
+    (tmp_path / "devops.yaml").write_text(
+        "output_dir: public-dist\ncloudformation_template: infra.yaml\ncloudformation_stack: app-stack\n"
+    )
+    config = load_config(tmp_path)
+    assert config.output_dir == "public-dist" and config.cloudformation_stack == "app-stack"
 
 
 def test_redaction_and_classification() -> None:
@@ -137,9 +145,30 @@ def test_plan_and_production_approval_guard(tmp_path: Path) -> None:
     with pytest.raises(ApprovalRequired):
         execute(plan, FakeProvider(), status, runner)
     assert not runner.calls
-    result = execute(plan, FakeProvider(), status, runner, approve=f"deploy:fake:{project.name}:production")
+    assert plan.approval_phrase is not None and "@acct#" in plan.approval_phrase
+    result = execute(plan, FakeProvider(), status, runner, approve=plan.approval_phrase)
     assert result.verdict == "UNVERIFIED"
     assert result.phases["deployment"] == "PASSED"
+
+
+def test_approval_phrase_changes_with_account_and_deployment_target(tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("ok")
+    project = analyze(tmp_path)
+    first = ProviderStatus("fake", "fake", True, "1", True, "account-one")
+    second = ProviderStatus("fake", "fake", True, "1", True, "account-two")
+    config = load_config(tmp_path)
+    first_plan = make_plan(project, config, FakeProvider(), first, "production")
+    assert (
+        first_plan.approval_phrase != make_plan(project, config, FakeProvider(), second, "production").approval_phrase
+    )
+
+    class ChangedTarget(FakeProvider):
+        def plan(self, project, environment):
+            return [CommandSpec(["fake", "deploy", "other-target"], "deploy fixture", True, True)]
+
+    assert (
+        first_plan.approval_phrase != make_plan(project, config, ChangedTarget(), first, "production").approval_phrase
+    )
 
 
 def test_account_change_blocks_deployment(tmp_path: Path) -> None:

@@ -31,7 +31,8 @@ def test_http_smoke_checks_main_page_and_asset() -> None:
         blocked = verify(url)
         assert blocked.verdict == "FAILED"
         allowed = verify(url, allow_private=True)
-        assert allowed.verdict == "HEALTHY"
+        assert allowed.verdict == "DEGRADED"
+        assert any(check.name == "https" and check.state == "DEGRADED" for check in allowed.checks)
         assert any(check.name == "asset" and check.state == "PASSED" for check in allowed.checks)
     finally:
         server.shutdown()

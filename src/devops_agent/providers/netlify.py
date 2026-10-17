@@ -31,6 +31,9 @@ class Provider(BaseProvider):
         "production_deploy",
         "deployment_inspection",
         "production_rollback",
+        "project_inspection",
+        "domain_inspection",
+        "environment_inspection",
     )
     login_hint = "netlify login"
 
@@ -96,6 +99,44 @@ class Provider(BaseProvider):
                 )
             ]
         return [CommandSpec([self.binary, "status", "--json"], "inspect linked Netlify site", False, cwd=root)]
+
+    def inspect_project(self, project: Any) -> list[CommandSpec]:
+        root = root_of(project)
+        site_id = self._linked(project)
+        return [
+            CommandSpec(
+                [self.binary, "api", "getSite", "--data", json.dumps({"site_id": site_id})],
+                "inspect linked Netlify site",
+                False,
+                cwd=root,
+            )
+        ]
+
+    def inspect_domains(self, project: Any) -> list[CommandSpec]:
+        return self.inspect_project(project)
+
+    def inspect_environment(self, project: Any, environment: str) -> list[CommandSpec]:
+        environment_name(environment)
+        root = root_of(project)
+        site_id = self._linked(project)
+        if environment == "staging":
+            raise UnsupportedOperation("Netlify site API has no distinct staging deployment environment")
+        payload = {"site_id": site_id, "production": environment == "production", "per_page": 10}
+        return [
+            CommandSpec(
+                [self.binary, "api", "listSiteDeploys", "--data", json.dumps(payload)],
+                f"inspect Netlify {environment} deployments",
+                False,
+                cwd=root,
+            )
+        ]
+
+    def plan_domain_change(self, project: Any, hostname: str, target: str) -> dict[str, object]:
+        self._linked(project)
+        raise UnsupportedOperation(
+            "Netlify CLI has no verified additive custom-domain command; updating a site could replace "
+            "its current primary domain"
+        )
 
     def rollback(self, project: Any, *, release: str | None = None) -> list[CommandSpec]:
         root = root_of(project)

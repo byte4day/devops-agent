@@ -27,6 +27,11 @@ _RULES = (
         "Active identity lacks permission for this operation",
     ),
     (
+        "DEPENDENCY_FAILURE",
+        r"module not found|cannot find module|no module named|package .* not found|npm err!.*404",
+        "A package or local dependency is missing",
+    ),
+    (
         "MISSING_ENVIRONMENT_VARIABLE",
         (
             r"(?:missing|undefined|not set|required).{0,50}"
@@ -35,11 +40,6 @@ _RULES = (
             r"(?:not set|missing|required)"
         ),
         "A required environment variable may be absent",
-    ),
-    (
-        "DEPENDENCY_FAILURE",
-        r"module not found|cannot find module|no module named|package .* not found|npm err!.*404",
-        "A package or local dependency is missing",
     ),
     (
         "DATABASE_ERROR",

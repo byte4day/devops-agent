@@ -14,6 +14,7 @@ import yaml
 class Config:
     provider: str | None = None
     project_name: str | None = None
+    output_dir: str | None = None
     default_environment: str = "preview"
     build_commands: tuple[tuple[str, ...], ...] = ()
     test_commands: tuple[tuple[str, ...], ...] = ()
@@ -26,6 +27,8 @@ class Config:
     aws_prefix: str | None = None
     aws_region: str | None = None
     aws_account_id: str | None = None
+    cloudformation_template: str | None = None
+    cloudformation_stack: str | None = None
     oss_bucket: str | None = None
     oss_prefix: str | None = None
     production_branch: str | None = None
@@ -66,6 +69,7 @@ def load_config(root: Path) -> Config:
     allowed = {
         "provider",
         "project_name",
+        "output_dir",
         "default_environment",
         "build_commands",
         "test_commands",
@@ -78,6 +82,8 @@ def load_config(root: Path) -> Config:
         "aws_prefix",
         "aws_region",
         "aws_account_id",
+        "cloudformation_template",
+        "cloudformation_stack",
         "oss_bucket",
         "oss_prefix",
         "production_branch",
@@ -89,10 +95,13 @@ def load_config(root: Path) -> Config:
     for key in (
         "provider",
         "project_name",
+        "output_dir",
         "aws_bucket",
         "aws_prefix",
         "aws_region",
         "aws_account_id",
+        "cloudformation_template",
+        "cloudformation_stack",
         "oss_bucket",
         "oss_prefix",
         "production_branch",
@@ -101,6 +110,11 @@ def load_config(root: Path) -> Config:
         if raw.get(key) is not None and (not isinstance(raw[key], str) or not raw[key].strip()):
             raise ValueError(f"{key} must be a nonempty string")
     environment = raw.get("default_environment", "preview")
+    output_dir = raw.get("output_dir")
+    if output_dir is not None and (
+        output_dir in {".", "./"} or Path(output_dir).is_absolute() or ".." in Path(output_dir).parts
+    ):
+        raise ValueError("output_dir must be a safe relative directory, not the project root")
     if environment not in {"preview", "staging", "production"}:
         raise ValueError("default_environment must be preview, staging, or production")
     targets = raw.get("allowed_targets", ["preview", "staging", "production"])
@@ -133,6 +147,7 @@ def load_config(root: Path) -> Config:
     return Config(
         provider=raw.get("provider"),
         project_name=raw.get("project_name"),
+        output_dir=output_dir,
         default_environment=environment,
         build_commands=_commands(raw.get("build_commands"), "build_commands"),
         test_commands=_commands(raw.get("test_commands"), "test_commands"),
@@ -145,6 +160,8 @@ def load_config(root: Path) -> Config:
         aws_prefix=raw.get("aws_prefix"),
         aws_region=raw.get("aws_region"),
         aws_account_id=raw.get("aws_account_id"),
+        cloudformation_template=raw.get("cloudformation_template"),
+        cloudformation_stack=raw.get("cloudformation_stack"),
         oss_bucket=raw.get("oss_bucket"),
         oss_prefix=raw.get("oss_prefix"),
         production_branch=raw.get("production_branch"),

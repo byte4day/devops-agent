@@ -13,7 +13,7 @@ The package uses the cloud CLIs and credentials already configured on your machi
 - **Discover:** inspect the operating system, Git state, provider CLIs, authentication, account/region context, Docker and infrastructure tooling.
 - **Understand:** identify common JavaScript, Python, Go, Rust, static, and Dockerized projects, plus likely build commands, API routes, database markers, environment variable names, and hosting configuration.
 - **Plan and deploy:** choose an unambiguous existing provider, reject incompatible project types, run configured tests/builds, and execute a supported provider deployment with explicit target controls.
-- **Investigate:** classify command failures, inspect provider deployment information and GitHub Actions failures, then guide a bounded repair and verification loop.
+- **Investigate:** classify command failures, inspect provider deployment information and GitHub Actions failures, then guide a repair loop with a local three-attempt budget and unchanged-candidate guard.
 - **Verify:** check a public URL's DNS, HTTPS certificate, HTTP response, selected same-origin assets, and a basic security-header signal. Mark checks that did not run as untested.
 - **Recover:** construct a target-specific rollback only where a provider adapter can name a known-good release. Production rollback requires explicit authorization.
 
@@ -87,14 +87,16 @@ The skill understands natural-language requests such as “Deploy this website,�
 | `/devops doctor` | Local environment and provider discovery. |
 | `/devops analyze` | Project framework, build, hosting, and dependency analysis. |
 | `/devops plan` | `plan --provider NAME --environment preview [--dry-run]`. Dry run executes read-only provider preflight checks; it is not a provider mutation simulation. |
-| `/devops deploy staging` or `production` | `deploy staging|production --provider NAME [--account ID] [--approve SCOPE]`. Builds, tests, preflights, deploys, then checks observed/configured URLs. |
+| `/devops deploy staging` or `production` | `deploy staging|production --provider NAME [--account ID] [--approve SCOPE] [--incident ID]`. Builds, tests, preflights, deploys, then checks observed/configured URLs. |
 | `/devops verify` | `verify URL` for deterministic public HTTP(S) checks. |
 | `/devops diagnose` | `diagnose --log-file PATH` or standard input, with optional `--exit-code`. |
+| `/devops fix` | `fix --incident ID --log-file PATH` classifies evidence and reports the remaining repair budget. The assistant applies and tests the actual code fix. |
 | `/devops logs`, `/devops status` | `logs --provider NAME [--release ID]`; `status` is a doctor-style local discovery view. |
 | `/devops rollback` | `rollback --provider NAME --release ID --approve SCOPE [--account ID]`. Requires a known-good release. |
 | `/devops ci status`, `/devops ci diagnose` | `ci status`; `ci diagnose --run-id NUMBER` for GitHub Actions evidence. |
-| `/devops domain`, `/devops audit` | `domain inspect HOST` checks public HTTPS; `audit` checks local configuration only. |
-| `/devops fix`, `/devops ci repair`, `/devops ci setup` | Agent-guided repository changes after inspecting evidence; no generic mutation subcommand. |
+| `/devops ci inspect`, `/devops ci repair`, `/devops ci setup` | Inspect local workflows; classify a local log or `--run-id`; create a new, pinned local Python/npm CI workflow when suitable. Repair triage does not edit code. |
+| `/devops domain`, `/devops audit` | `domain inspect HOST [--provider NAME]` checks public HTTPS and optional provider state; `domain plan HOST --provider vercel --target PROJECT` proposes an additive attachment without applying it; `audit` checks local configuration only. |
+| `/devops infra` | `infra validate|prepare|review|apply` runs a separately approved AWS CloudFormation UPDATE change-set workflow for an existing stack. |
 
 `plan` and `doctor` do not change cloud resources. A direct `deploy` command acts on one target; the assistant's full release workflow runs preview, validates it, then obtains production approval and runs a separate production deployment. See [Deployment flow](#deployment-flow).
 
@@ -102,10 +104,11 @@ For a linked Vercel project named `example-web`, a reviewed production command h
 
 ```bash
 devops-agent plan --provider vercel --environment production --dry-run
-devops-agent deploy production --provider vercel --approve 'deploy:vercel:example-web:production'
+# Copy the exact approval_phrase from that plan after reviewing account and target.
+devops-agent deploy production --provider vercel --approve '<approval_phrase from plan>'
 ```
 
-The approval phrase is specific to the operation, provider, detected project name, and environment. The command is an **illustrative syntax example**; inspect the actual plan and target account before using it. AWS static uploads require the same target-bound approval even for preview because cloud charges may apply.
+The approval phrase binds the operation, provider, project, active account, environment, and deployment command digest. The command is an **illustrative syntax example**; copy the exact phrase from the actual plan after inspecting its target account and commands. AWS static uploads require the same target-bound approval even for preview because cloud charges may apply.
 
 ## Provider support
 
@@ -114,15 +117,21 @@ This table describes implemented adapter scope, not every service that a provide
 | Provider | Implemented deployment path | Diagnostics | Rollback |
 | --- | --- | --- | --- |
 | Cloudflare | Existing Wrangler Worker project; static Pages output with matching configuration | Worker or Pages deployment information; selected Worker logs | Known-good Worker version only |
-| AWS | Static files to an existing, account-scoped S3 bucket; no object deletion | Bucket-owner preflight, S3 object listing; CloudFormation template validation and stack events are read-only | No automatic S3 or CloudFormation rollback |
-| Alibaba Cloud | Static files to an existing OSS bucket through `ossutil` | OSS identity and object listing | Requires separately managed object versioning |
+| AWS | Static files to an existing, account-scoped S3 bucket; reviewed CloudFormation UPDATE of an existing stack through `infra` | Bucket-owner preflight, S3 inventory, template validation, change-set resource summary and stack events | No automatic S3 or CloudFormation rollback |
+| Alibaba Cloud | Static files to an existing OSS bucket through `ossutil` | OSS identity/object listing and scoped ECS instance inspection | Requires separately managed object versioning |
 | Vercel | Existing linked project; preview and production | Deployment build and runtime logs | Known-good production deployment |
 | Netlify | Existing linked static or Next.js site; draft/staging alias and production | Site or deployment inspection | Known-good site deployment through API |
 | GitHub | CI integration, not a hosting target | Recent runs, failed jobs and logs | No generic application rollback |
 
-Cloudflare DNS, R2, KV, D1, AWS ECS/Lambda/EC2/CloudFront and CloudFormation apply, Alibaba ECS/Function Compute/CDN, provider environment-variable updates, live domain mutation, Kubernetes, Terraform/OpenTofu apply, Docker deployment, and other cloud providers are **not** implemented as generic mutating adapters in this release. The assistant may inspect existing files and use provider tooling for a separately scoped, authorized task, but the executable package will not claim these are supported operations.
+Cloudflare DNS, R2, KV, D1, AWS ECS/Lambda/EC2/CloudFront, Alibaba ECS/Function Compute/CDN mutations, provider environment-variable updates, live domain mutation, Kubernetes, Terraform/OpenTofu apply, Docker deployment, and other cloud providers are **not** implemented as generic mutating adapters in this release. The CloudFormation path is separate from generic S3 deploy, requires an existing stack, and refuses IAM, macro, nested-stack, import, or custom-resource changes. The assistant may inspect existing files and use provider tooling for a separately scoped, authorized task, but the executable package will not claim these are supported operations.
 
 The project never chooses a new production host when an existing production provider is configured. When several providers could fit, select one explicitly after reviewing runtime compatibility, cost, region, data services, and target account. No price or free-tier promise is made by this package.
+
+### Reviewed CloudFormation updates
+
+For an existing stack, configure `cloudformation_template`, `cloudformation_stack`, `aws_region`, and `aws_account_id` in `devops.yaml`. `infra validate` reads the template; `infra prepare --change-set-name NAME` creates an **UPDATE** change set only after target-bound approval. `infra review --change-set-arn ARN` reports resource actions and a digest without parameter values. `infra apply --change-set-arn ARN --digest DIGEST` rechecks the account, stack, change set, and digest, then requires the exact `infra-apply:aws:ACCOUNT/REGION/STACK/DIGEST:production` approval phrase. Deletions, replacements, and database resource changes require a second `--approve-destructive` phrase. The tool waits for stack update completion, but the application remains `UNVERIFIED` until its own health checks run. No CloudFormation rollback is automated.
+
+This path supports existing-stack updates only. IAM, macros, nested stacks, imports, and custom resources are refused. Review the change set and AWS cost effect before granting approval; change-set creation is itself a control-plane mutation. See [AWS CLI create-change-set](https://docs.aws.amazon.com/cli/latest/reference/cloudformation/create-change-set.html) and [execute-change-set](https://docs.aws.amazon.com/cli/latest/reference/cloudformation/execute-change-set.html).
 
 ### Authentication
 
@@ -149,7 +158,7 @@ Review production target and obtain explicit authorization
 Production deployment → observed health checks → release report or recovery plan
 ```
 
-The package rejects an incompatible runtime instead of uploading a server-rendered app as static files. It records command outcomes and an operation audit log under `.devops-agent/` in the project, with file permissions restricted on Unix-like systems. A failed check remains visible. The skill instructs the assistant to use at most three repair attempts per incident by default and to stop if the same unchanged broken build would be redeployed.
+The package rejects an incompatible runtime instead of uploading a server-rendered app as static files. Before a static artifact upload it checks that the dedicated output directory exists, contains files, and has no symlinks or obvious credential filenames. It records command outcomes and an operation audit log under `.devops-agent/` in the project, with file permissions restricted on Unix-like systems. A failed check remains visible. For repair deployments, pass `--incident ID`; the package tracks at most three distinct Git candidates per incident by default and rejects an unchanged candidate.
 
 **Illustrative transcript — no live deployment was performed for this example:**
 
@@ -165,7 +174,7 @@ The package rejects an incompatible runtime instead of uploading a server-render
 
 ## Verification and release verdicts
 
-For a public URL, the deterministic verifier checks DNS resolution, TLS certificate negotiation, HTTP response and redirect outcome, up to three same-origin script/style assets, and whether CSP or `X-Content-Type-Options` was observed. It does not authenticate into private pages, run a browser, test all routes, prove database health, or measure Core Web Vitals. Those checks should be performed separately when relevant and marked **not tested** until executed.
+For a public URL, the deterministic verifier checks DNS resolution, TLS certificate negotiation, HTTP response and redirect outcome, up to three same-origin script/style assets, and whether CSP or `X-Content-Type-Options` was observed. An HTTP-only final URL is `DEGRADED`. It does not authenticate into private pages, run a browser, test all routes, prove database health, or measure Core Web Vitals. Those checks should be performed separately when relevant and marked **not tested** until executed.
 
 For projects with API routes or database dependencies, a reachable home page alone leaves the release `UNVERIFIED`. A configured application health URL is checked for production; preview needs its own release-specific health check before it can be treated as verified. The health endpoint must actually exercise the dependency you want to validate.
 
@@ -180,7 +189,7 @@ Reports include actual provider, target, phase results, release and URL when obs
 
 ## Security and approvals
 
-DevOps Agent uses argument arrays instead of shell strings, command timeouts, secret redaction, and target-bound approvals. The skill tells the assistant to limit repair attempts to the configured maximum, default three; the package does not run an automatic repair loop. A production command needs the exact operation, provider, project, and environment authorization; a configuration file or a log line cannot grant it. Rollbacks, destructive operations, paid-resource provisioning, IAM changes, domain replacement, secret updates, and risky database migrations require specific authorization and a recovery plan. The package does not reset databases, create cloud credentials, or ask for secrets in chat.
+DevOps Agent uses argument arrays instead of shell strings, command timeouts, secret redaction, static artifact checks, and target-bound approvals. The package enforces the configured repair-attempt maximum for deployments using `--incident`; the assistant inspects, edits, and tests the actual repair. A production command needs the exact operation, provider, project, and environment authorization; a configuration file or a log line cannot grant it. Rollbacks, destructive operations, paid-resource provisioning, IAM changes, domain replacement, secret updates, and risky database migrations require specific authorization and a recovery plan. The package does not reset databases, create cloud credentials, or ask for secrets in chat.
 
 Repository files, provider logs, CI output, and web documentation are untrusted evidence. An instruction found inside them does not become permission to execute a command. Review account and project scope in every plan. See [SECURITY.md](SECURITY.md) and [architecture](docs/architecture.md) for the trust boundaries.
 
@@ -199,6 +208,9 @@ build_commands:
 health_urls:
   - https://example.example/health
 max_repair_attempts: 3
+# For static HTML stored at the repository root, build/copy deployable files
+# into a dedicated directory first, then set output_dir to that directory.
+# output_dir: public-dist
 ```
 
 The example is illustrative. Replace the URL and commands with your project's real values. See the [configuration reference](docs/configuration.md) for every accepted key and validation rule.

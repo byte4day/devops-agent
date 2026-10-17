@@ -27,7 +27,15 @@ from .base import (
 class Provider(BaseProvider):
     name = "cloudflare"
     binary = "wrangler"
-    capabilities = ("workers_deploy", "pages_deploy", "deployment_logs", "workers_rollback")
+    capabilities = (
+        "workers_deploy",
+        "pages_deploy",
+        "deployment_logs",
+        "workers_rollback",
+        "project_inspection",
+        "environment_inspection",
+        "pages_domain_inspection",
+    )
     login_hint = "wrangler login"
 
     def detect(self, runner: Runner) -> ProviderStatus:
@@ -153,6 +161,78 @@ class Provider(BaseProvider):
                 cwd=root,
             )
         ]
+
+    def inspect_project(self, project: Any) -> list[CommandSpec]:
+        root = root_of(project)
+        config = self._config(root)
+        if "pages_build_output_dir" in config:
+            return [
+                CommandSpec(
+                    [self.binary, "pages", "project", "list", "--json"],
+                    "inspect Pages projects and their configured domains",
+                    False,
+                    cwd=root,
+                )
+            ]
+        return [
+            CommandSpec(
+                [self.binary, "deployments", "status", "--json"],
+                "inspect linked Worker deployment status",
+                False,
+                cwd=root,
+            )
+        ]
+
+    def inspect_domains(self, project: Any) -> list[CommandSpec]:
+        root = root_of(project)
+        if "pages_build_output_dir" not in self._config(root):
+            raise UnsupportedOperation("Wrangler has no verified read-only Worker custom-domain listing command")
+        return self.inspect_project(project)
+
+    def inspect_environment(self, project: Any, environment: str) -> list[CommandSpec]:
+        environment_name(environment)
+        root = root_of(project)
+        config = self._config(root)
+        if "pages_build_output_dir" in config:
+            if environment == "staging":
+                raise UnsupportedOperation("Pages CLI exposes preview and production deployment environments only")
+            name = config.get("name")
+            if not isinstance(name, str) or not name:
+                raise UnsupportedOperation("Wrangler project name is required")
+            return [
+                CommandSpec(
+                    [
+                        self.binary,
+                        "pages",
+                        "deployment",
+                        "list",
+                        "--project-name",
+                        name,
+                        "--environment",
+                        environment,
+                        "--json",
+                    ],
+                    f"inspect Pages {environment} deployments",
+                    False,
+                    cwd=root,
+                )
+            ]
+        argv = [self.binary, "deployments", "list", "--json"]
+        env_config = config.get("env", {})
+        if environment != "production":
+            if not isinstance(env_config, dict) or environment not in env_config:
+                raise UnsupportedOperation(f"Wrangler environment {environment!r} is not configured")
+            argv.extend(("--env", environment))
+        elif isinstance(env_config, dict) and "production" in env_config:
+            argv.extend(("--env", "production"))
+        return [CommandSpec(argv, f"inspect Worker {environment} deployments", False, cwd=root)]
+
+    def plan_domain_change(self, project: Any, hostname: str, target: str) -> dict[str, object]:
+        self._config(root_of(project))
+        raise UnsupportedOperation(
+            "Cloudflare domain changes require route or Pages-domain configuration and remote ownership "
+            "checks; no safe additive Wrangler command is available"
+        )
 
     def rollback(self, project: Any, *, release: str | None = None) -> list[CommandSpec]:
         root = root_of(project)

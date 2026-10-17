@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import asdict, dataclass
 
 from devops_agent.core.analyzer import ProjectAnalysis
+from devops_agent.core.approvals import ApprovalScope
 from devops_agent.core.config import Config
 from devops_agent.core.security import redact
 from devops_agent.providers.base import CommandSpec, ProviderStatus, UnsupportedOperation
@@ -22,6 +25,14 @@ class DeploymentPlan:
     health_urls: tuple[str, ...]
     application_health_required: bool
     warnings: tuple[str, ...]
+    artifact_output_dir: str | None = None
+    approval_target: str | None = None
+
+    @property
+    def approval_phrase(self) -> str | None:
+        if self.environment != "production" and self.provider != "aws":
+            return None
+        return ApprovalScope("deploy", self.provider, self.approval_target or self.project, self.environment).phrase
 
     def to_dict(self) -> dict[str, object]:
         data = asdict(self)
@@ -30,6 +41,7 @@ class DeploymentPlan:
                 {**asdict(spec), "argv": [redact(arg) for arg in spec.argv], "cwd": str(spec.cwd) if spec.cwd else None}
                 for spec in getattr(self, group)
             ]
+        data["approval_phrase"] = self.approval_phrase
         return data
 
 
@@ -79,6 +91,10 @@ def make_plan(
         raise RuntimeError(f"{status.name} CLI is unavailable")
     if not status.authenticated:
         raise RuntimeError(f"{status.name} is not authenticated: {status.detail or 'run the official login command'}")
+    if status.name == "cloudflare" and not status.account:
+        raise UnsupportedOperation(
+            "Cloudflare has multiple or unknown accounts; select one with scoped Wrangler configuration"
+        )
     build: list[CommandSpec] = []
     test_commands = config.test_commands or project.test_commands
     build_commands = config.build_commands or ((project.build_command,) if project.build_command else ())
@@ -109,6 +125,15 @@ def make_plan(
     deploy = tuple(provider.plan(target, environment))
     if not deploy or any(not step.mutating for step in deploy):
         raise UnsupportedOperation("Provider returned no executable deployment steps")
+    artifact_output_dir = None
+    if project.static and (
+        provider.name in {"aws", "alibaba"}
+        or provider.name == "netlify"
+        and "--dir" in deploy[0].argv
+        or provider.name == "cloudflare"
+        and deploy[0].argv[1:3] == ["pages", "deploy"]
+    ):
+        artifact_output_dir = project.output_dir
     warnings = ["Production requires target-bound approval"] if environment == "production" else []
     app_health_required = project.api_routes or bool(project.database_dependencies)
     if app_health_required and not config.health_urls:
@@ -117,6 +142,19 @@ def make_plan(
         warnings.append("No health URL configured; release will be UNVERIFIED unless the provider returns a URL")
     if app_health_required and environment != "production":
         warnings.append("Preview application health needs a release-specific health URL")
+    approval_digest = hashlib.sha256(
+        json.dumps(
+            {
+                "account": status.account,
+                "root": str(project.root),
+                "provider": status.name,
+                "environment": environment,
+                "commands": [spec.argv for spec in deploy],
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()[:16]
+    approval_target = f"{project.name}@{status.account or 'unknown'}#{approval_digest}"
     return DeploymentPlan(
         project.name,
         status.name,
@@ -128,6 +166,8 @@ def make_plan(
         config.health_urls,
         app_health_required,
         tuple(warnings),
+        artifact_output_dir,
+        approval_target,
     )
 
 
@@ -138,6 +178,8 @@ def provider_target(project: ProjectAnalysis, config: Config) -> dict[str, objec
         "aws_prefix": config.aws_prefix,
         "aws_region": config.aws_region,
         "aws_account_id": config.aws_account_id,
+        "cloudformation_template": config.cloudformation_template,
+        "cloudformation_stack": config.cloudformation_stack,
         "oss_bucket": config.oss_bucket,
         "oss_prefix": config.oss_prefix,
         "production_branch": config.production_branch,

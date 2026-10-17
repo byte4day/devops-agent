@@ -22,13 +22,15 @@ from .base import (
 
 _BUCKET = re.compile(r"^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$")
 _PREFIX = re.compile(r"^(?:[A-Za-z0-9._/-]*/)?$")
+_INSTANCE = re.compile(r"^i-[A-Za-z0-9]{6,64}$")
+_REGION = re.compile(r"^[a-z]{2}(?:-[a-z0-9]+)+$")
 
 
 class Provider(BaseProvider):
     name = "alibaba"
     binary = "aliyun"
     version_args = ("version",)
-    capabilities = ("identity_inspection", "oss_static_upload")
+    capabilities = ("identity_inspection", "oss_static_upload", "ecs_instance_inspection")
     login_hint = "aliyun configure --mode OAuth"
 
     def detect(self, runner: Runner) -> ProviderStatus:
@@ -51,7 +53,7 @@ class Provider(BaseProvider):
             oss = runner.run(oss_spec)
         except (FileNotFoundError, OSError):
             oss = OperationResult(oss_spec, 127)
-        capabilities = self.capabilities if oss.ok else ("identity_inspection",)
+        capabilities = self.capabilities if oss.ok else ("identity_inspection", "ecs_instance_inspection")
         detail = None if oss.ok else "ossutil unavailable; OSS deployment unsupported"
         return self._status(version, True, account=account, region=region, detail=detail, capabilities=capabilities)
 
@@ -90,7 +92,7 @@ class Provider(BaseProvider):
         destination = self._destination(project)
         return [
             CommandSpec(
-                ["ossutil", "ls", destination],
+                ["ossutil", "ls", destination, "--limited-num=50"],
                 "verify OSS bucket and prefix access",
                 False,
                 cwd=root,
@@ -101,10 +103,35 @@ class Provider(BaseProvider):
         root = root_of(project)
         return [
             CommandSpec(
-                ["ossutil", "ls", self._destination(project)],
+                ["ossutil", "ls", self._destination(project), "--limited-num=50"],
                 "inspect OSS uploaded objects",
                 False,
                 cwd=root,
+            )
+        ]
+
+    def diagnose_ecs(self, project: Any, instance_id: str, region: str) -> list[CommandSpec]:
+        """Inspect one known ECS instance without changing it or enumerating the account."""
+        if not _INSTANCE.fullmatch(instance_id):
+            raise UnsupportedOperation("a valid ECS instance ID is required")
+        if not _REGION.fullmatch(region):
+            raise UnsupportedOperation("an explicit Alibaba Cloud region is required")
+        return [
+            CommandSpec(
+                [
+                    "aliyun",
+                    "ecs",
+                    "DescribeInstances",
+                    "--RegionId",
+                    region,
+                    "--InstanceIds",
+                    json.dumps([instance_id]),
+                    "--output",
+                    "cols=InstanceId,InstanceName,Status,InstanceType rows=Instances.Instance[]",
+                ],
+                f"inspect ECS instance {instance_id} in {region}",
+                False,
+                cwd=root_of(project),
             )
         ]
 
