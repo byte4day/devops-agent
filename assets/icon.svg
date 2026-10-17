@@ -1,7 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
   <title id="title">DevOps Agent icon</title>
-  <desc id="desc">Two infrastructure brackets joined by a green deployment bridge.</desc>
+  <desc id="desc">A geometric agent portrait with two green eyes and a structured collar.</desc>
   <rect width="64" height="64" rx="14" fill="#101114"/>
-  <path d="M26 16H16v32h10M38 16h10v32H38" fill="none" stroke="#F3F3F1" stroke-width="4" stroke-linecap="square" stroke-linejoin="miter"/>
-  <path d="M25 32h14" fill="none" stroke="#71A894" stroke-width="4" stroke-linecap="square"/>
+  <path d="M23 13h18l7 8v11l-7 8H23l-7-8V21l7-8Z" fill="none" stroke="#F3F3F1" stroke-width="3.3" stroke-linejoin="miter"/>
+  <path d="M24 26h5m6 0h5" fill="none" stroke="#71A894" stroke-width="4" stroke-linecap="square"/>
+  <path d="M28 35h8" fill="none" stroke="#93979F" stroke-width="2" stroke-linecap="square"/>
+  <path d="M20 53v-4l8-5h8l8 5v4" fill="none" stroke="#F3F3F1" stroke-width="3.3" stroke-linecap="square" stroke-linejoin="miter"/>
 </svg>

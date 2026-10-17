@@ -1,10 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 280" role="img" aria-labelledby="title desc">
   <title id="title">DevOps Agent</title>
-  <desc id="desc">DevOps Agent banner showing a deployment bridge and a three-stage operations path.</desc>
+  <desc id="desc">DevOps Agent banner with a geometric agent portrait and a three-stage operations path.</desc>
   <rect width="1200" height="280" rx="18" fill="#101114"/>
   <g transform="translate(57 65) scale(1.45)">
-    <path d="M26 16H16v32h10M38 16h10v32H38" fill="none" stroke="#F3F3F1" stroke-width="4" stroke-linecap="square" stroke-linejoin="miter"/>
-    <path d="M25 32h14" fill="none" stroke="#71A894" stroke-width="4" stroke-linecap="square"/>
+    <path d="M23 13h18l7 8v11l-7 8H23l-7-8V21l7-8Z" fill="none" stroke="#F3F3F1" stroke-width="3.3" stroke-linejoin="miter"/>
+    <path d="M24 26h5m6 0h5" fill="none" stroke="#71A894" stroke-width="4" stroke-linecap="square"/>
+    <path d="M28 35h8" fill="none" stroke="#93979F" stroke-width="2" stroke-linecap="square"/>
+    <path d="M20 53v-4l8-5h8l8 5v4" fill="none" stroke="#F3F3F1" stroke-width="3.3" stroke-linecap="square" stroke-linejoin="miter"/>
   </g>
   <text x="163" y="132" fill="#F3F3F1" font-family="Arial, Helvetica, sans-serif" font-size="62" font-weight="700" letter-spacing="-2.4">DevOps <tspan fill="#93979F">Agent</tspan></text>
   <text x="166" y="173" fill="#93979F" font-family="Arial, Helvetica, sans-serif" font-size="20">Deploy, debug, and operate from your AI coding assistant.</text>
