@@ -19,10 +19,15 @@ _REDACTIONS = [
     re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b"),
 ]
+_SENSITIVE_ENV = re.compile(r"(?i)(?:SECRET|TOKEN|PASSWORD|API_KEY|PRIVATE_KEY|ACCESS_KEY|CREDENTIAL|COOKIE)")
 
 
 def redact(value: str) -> str:
     """Remove common token forms from logs and reports."""
+    # Provider CLIs sometimes emit a credential without its variable name.
+    for name, secret in os.environ.items():
+        if _SENSITIVE_ENV.search(name) and 8 <= len(secret) <= 4096 and secret in value:
+            value = value.replace(secret, "[REDACTED]")
     for pattern in _REDACTIONS:
         if pattern.groups == 1:
             value = pattern.sub(r"\1[REDACTED]", value)

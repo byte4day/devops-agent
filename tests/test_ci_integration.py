@@ -119,6 +119,16 @@ def test_inspection_summarizes_without_exposing_secret_values(tmp_path: Path) ->
     assert "very-private-test-value" not in str(result)
 
 
+@pytest.mark.parametrize("trigger", ["", "[]", "null", "[push, 123]", "{}"])
+def test_inspection_rejects_empty_or_invalid_triggers(tmp_path: Path, trigger: str) -> None:
+    folder = tmp_path / ".github" / "workflows"
+    folder.mkdir(parents=True)
+    (folder / "broken.yml").write_text(f"name: Test\non: {trigger}\njobs:\n  test:\n    runs-on: ubuntu-latest\n")
+    result = inspect_workflows(tmp_path)
+    assert result["valid"] is False
+    assert result["workflows"][0]["error"]
+
+
 def test_repair_classifies_failure_without_following_log_instructions(tmp_path: Path) -> None:
     marker = tmp_path / "should-not-exist"
     fixture_token = "ghp_" + "a" * 32

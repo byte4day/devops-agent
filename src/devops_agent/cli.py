@@ -105,6 +105,10 @@ def _run_reads(runner: SubprocessRunner, specs: list[object]) -> list[dict[str, 
     return items
 
 
+def _reads_failed(items: list[dict[str, object]]) -> bool:
+    return any(item["returncode"] != 0 for item in items)
+
+
 def _run_scoped_ops(
     root: Path, runner: SubprocessRunner, specs: list[object], *, operation: str, target: str
 ) -> list[dict[str, object]]:
@@ -194,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
                     target = provider_target(project, load_config(root))
                     data["provider_inspection"] = _run_reads(runner, provider.inspect_domains(target))
                 _emit(data)
-                return 0 if result.verdict != "FAILED" else 1
+                return 1 if result.verdict == "FAILED" or _reads_failed(data.get("provider_inspection", [])) else 0
             if not args.provider or not args.target:
                 raise ValueError("domain plan requires --provider and --target")
             provider = next((p for p in providers if p.name == args.provider), None)
@@ -224,8 +228,9 @@ def main(argv: list[str] | None = None) -> int:
                 raise PermissionError("Active AWS account must match devops.yaml aws_account_id")
             target = provider_target(project, config)
             if args.action == "validate":
-                _emit(_run_reads(runner, aws.validate_cloudformation(target)))
-                return 0
+                results = _run_reads(runner, aws.validate_cloudformation(target))
+                _emit(results)
+                return 1 if _reads_failed(results) else 0
             scope_target = f"{config.aws_account_id}/{config.aws_region}/{config.cloudformation_stack}"
             if args.action == "prepare":
                 if not args.change_set_name:
@@ -290,8 +295,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "ci":
             if args.action == "inspect":
-                _emit(inspect_workflows(root))
-                return 0
+                inspection = inspect_workflows(root)
+                _emit(inspection)
+                return 0 if inspection["valid"] else 1
             if args.action == "setup":
                 _emit(setup_ci(root, runtime=args.runtime))
                 return 0
@@ -310,7 +316,8 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError(status.detail or "gh authentication required")
             target = provider_target(project, config)
             if args.action == "status":
-                _emit(_run_reads(runner, github.ci_status(target)))
+                results = _run_reads(runner, github.ci_status(target))
+                _emit(results)
             else:
                 if not args.run_id or not re.fullmatch(r"[1-9][0-9]*", args.run_id):
                     raise ValueError("ci diagnose requires numeric --run-id")
@@ -320,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
                     _emit({"run": results, "repair": repair_ci(root, evidence, args.exit_code)})
                 else:
                     _emit(results)
-            return 0
+            return 1 if _reads_failed(results) else 0
         if args.command in {"logs", "rollback"}:
             provider = next((p for p in providers if p.name == args.provider), None)
             if provider is None:
@@ -330,8 +337,9 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError(status.detail or "Provider authentication required")
             target = provider_target(project, config)
             if args.command == "logs":
-                _emit(_run_reads(runner, provider.logs(target, release=args.release)))
-                return 0
+                results = _run_reads(runner, provider.logs(target, release=args.release))
+                _emit(results)
+                return 1 if _reads_failed(results) else 0
             rollback_target = f"{status.account or 'unknown'}/{project.name}/{args.release or 'unknown'}"
             require_approval(ApprovalScope("rollback", provider.name, rollback_target, "production"), args.approve)
             if args.account is not None and status.account != args.account:

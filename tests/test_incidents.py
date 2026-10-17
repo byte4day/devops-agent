@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -111,3 +112,34 @@ def test_fingerprint_accepts_monorepo_service_directory(tmp_path: Path) -> None:
     before = candidate_fingerprint(service)
     (service / "index.html").write_text("changed")
     assert candidate_fingerprint(service) != before
+
+
+def test_repair_reservations_are_atomic_across_threads(tmp_path: Path) -> None:
+    ledger = IncidentLedger(tmp_path)
+    fingerprints = [f"{index:064x}" for index in range(12)]
+
+    def reserve(fingerprint: str) -> bool:
+        try:
+            ledger.reserve("same-incident", fingerprint, 3)
+        except PermissionError:
+            return False
+        return True
+
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        accepted = list(pool.map(reserve, fingerprints))
+    assert sum(accepted) == 3
+    assert ledger.attempts("same-incident") == 3
+
+
+def test_untracked_env_values_do_not_affect_candidate_fingerprint(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+    (tmp_path / "app.py").write_text("pass\n")
+    _git(tmp_path, "add", "app.py")
+    _git(tmp_path, "commit", "-qm", "initial")
+    initial = candidate_fingerprint(tmp_path)
+    (tmp_path / ".env.production").write_text("API_TOKEN=one\n")
+    assert candidate_fingerprint(tmp_path) == initial
+    (tmp_path / ".env.production").write_text("API_TOKEN=two\n")
+    assert candidate_fingerprint(tmp_path) == initial

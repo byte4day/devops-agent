@@ -1,12 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/devops-agent/devops-agent/blob/main/schemas/devops.schema.json",
+  "$id": "https://raw.githubusercontent.com/byte4day/devops-agent/main/schemas/devops.schema.json",
   "title": "DevOps Agent project configuration",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "provider": {"type": "string", "minLength": 1},
     "project_name": {"type": "string", "minLength": 1},
+    "output_dir": {"type": "string", "minLength": 1},
     "default_environment": {"enum": ["preview", "staging", "production"]},
     "allowed_targets": {"type": "array", "minItems": 1, "items": {"enum": ["preview", "staging", "production"]}},
     "build_commands": {"$ref": "#/$defs/commands"},
@@ -19,6 +20,8 @@
     "aws_prefix": {"type": "string", "minLength": 1},
     "aws_region": {"type": "string", "minLength": 1},
     "aws_account_id": {"type": "string", "minLength": 1},
+    "cloudformation_template": {"type": "string", "minLength": 1},
+    "cloudformation_stack": {"type": "string", "minLength": 1},
     "oss_bucket": {"type": "string", "minLength": 1},
     "oss_prefix": {"type": "string", "minLength": 1},
     "production_branch": {"type": "string", "minLength": 1},

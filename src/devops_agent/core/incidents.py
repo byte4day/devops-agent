@@ -8,7 +8,9 @@ import os
 import re
 import shutil
 import subprocess
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from devops_agent.core.executor import AuditLog
 
@@ -50,9 +52,12 @@ def candidate_fingerprint(root: Path) -> str:
                 if not raw:
                     continue
                 relative = raw.decode("utf-8", errors="surrogateescape")
-                if Path(relative).parts[0] == ".devops-agent":
+                candidate = Path(relative)
+                if candidate.parts[0] == ".devops-agent" or any(
+                    part == ".env" or part.startswith(".env.") for part in candidate.parts
+                ):
                     continue
-                if Path(relative).suffix.lower() in ignored_untracked:
+                if candidate.suffix.lower() in ignored_untracked:
                     continue
                 path = root / relative
                 if path.is_symlink() or not path.is_file() or path.stat().st_size > 10 * 1024 * 1024:
@@ -64,26 +69,66 @@ def candidate_fingerprint(root: Path) -> str:
     return digest.hexdigest()
 
 
+@contextmanager
+def _exclusive_lock(path: Path) -> Iterator[None]:
+    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, 0o600)
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            os.write(fd, b"\0")
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if os.name == "nt":
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
 class IncidentLedger:
     """Reserve at most a configured number of distinct candidates per incident."""
 
     def __init__(self, root: Path):
         self.audit = AuditLog(root)
         self.path = self.audit.folder / "incidents.json"
+        self.lock_path = self.audit.folder / "incidents.lock"
         if self.path.is_symlink():
             raise ValueError("Incident ledger cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("Incident lock cannot be a symlink")
+
+    def _load(self) -> dict[str, object]:
+        try:
+            fd = os.open(self.path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        except FileNotFoundError:
+            return {}
+        with os.fdopen(fd, "r", encoding="utf-8") as handle:
+            if os.fstat(handle.fileno()).st_size > 65536:
+                raise ValueError("Incident ledger exceeds 64 KiB")
+            data = json.load(handle)
+        if not isinstance(data, dict):
+            raise ValueError("Incident ledger is invalid")
+        return data
 
     def attempts(self, incident: str) -> int:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", incident):
             raise ValueError("Incident ID must be 1-80 safe characters")
-        if not self.path.exists():
-            return 0
-        if self.path.stat().st_size > 65536:
-            raise ValueError("Incident ledger exceeds 64 KiB")
-        data = json.loads(self.path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict) or not isinstance(data.get(incident, []), list):
-            raise ValueError("Incident ledger is invalid")
-        return len(data.get(incident, []))
+        with _exclusive_lock(self.lock_path):
+            attempts = self._load().get(incident, [])
+            if not isinstance(attempts, list):
+                raise ValueError("Incident ledger is invalid")
+            return len(attempts)
 
     def reserve(self, incident: str, fingerprint: str, maximum: int) -> int:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", incident):
@@ -92,32 +137,26 @@ class IncidentLedger:
             raise ValueError("Invalid candidate fingerprint")
         if not 0 <= maximum <= 3:
             raise ValueError("Repair attempt maximum must be 0-3")
-        if self.path.exists():
-            if self.path.stat().st_size > 65536:
-                raise ValueError("Incident ledger exceeds 64 KiB")
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-            if not isinstance(data, dict):
+        with _exclusive_lock(self.lock_path):
+            data = self._load()
+            attempts = data.get(incident, [])
+            if not isinstance(attempts, list) or any(not isinstance(item, str) for item in attempts):
                 raise ValueError("Incident ledger is invalid")
-        else:
-            data = {}
-        attempts = data.get(incident, [])
-        if not isinstance(attempts, list) or any(not isinstance(item, str) for item in attempts):
-            raise ValueError("Incident ledger is invalid")
-        if fingerprint in attempts:
-            raise PermissionError("This unchanged candidate was already deployed for the incident")
-        if len(attempts) >= maximum:
-            raise PermissionError(f"Repair incident {incident!r} reached its {maximum}-attempt limit")
-        attempts.append(fingerprint)
-        data[incident] = attempts
-        temporary = self.audit.folder / f".incidents-{os.getpid()}.tmp"
-        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                json.dump(data, handle, sort_keys=True)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, self.path)
-        finally:
-            temporary.unlink(missing_ok=True)
-        self.audit.write("repair_attempt_reserved", incident=incident, attempt=len(attempts))
-        return len(attempts)
+            if fingerprint in attempts:
+                raise PermissionError("This unchanged candidate was already deployed for the incident")
+            if len(attempts) >= maximum:
+                raise PermissionError(f"Repair incident {incident!r} reached its {maximum}-attempt limit")
+            attempts.append(fingerprint)
+            data[incident] = attempts
+            temporary = self.audit.folder / f".incidents-{os.getpid()}.tmp"
+            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    json.dump(data, handle, sort_keys=True)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, self.path)
+            finally:
+                temporary.unlink(missing_ok=True)
+            self.audit.write("repair_attempt_reserved", incident=incident, attempt=len(attempts))
+            return len(attempts)

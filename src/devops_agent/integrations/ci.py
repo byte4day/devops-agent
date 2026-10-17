@@ -50,10 +50,11 @@ def _workflow_summary(path: Path, root: Path) -> dict[str, object]:
         if any(not isinstance(job, dict) or ("runs-on" not in job and "uses" not in job) for job in jobs.values()):
             raise ValueError("each workflow job requires runs-on or uses")
         events = list(trigger) if isinstance(trigger, (dict, list)) else [trigger]
-        safe_events = [event for event in events if isinstance(event, str) and _EVENT.fullmatch(event)]
+        if not events or any(not isinstance(event, str) or not _EVENT.fullmatch(event) for event in events):
+            raise ValueError("workflow on trigger must name at least one valid event")
         summary.update(
             valid=True,
-            triggers=safe_events,
+            triggers=events,
             job_count=len(jobs),
             has_ci_job=any(_CI_JOB.search(str(job)) for job in jobs),
         )

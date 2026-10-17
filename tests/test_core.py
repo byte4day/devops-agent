@@ -99,6 +99,17 @@ def test_redaction_and_classification() -> None:
     assert classify("Timed out", 124).category == "DEPLOYMENT_TIMEOUT"
 
 
+def test_redaction_removes_standalone_secret_environment_value(monkeypatch, tmp_path: Path) -> None:
+    fixture_value = "secret-fixture-value-123456"
+    monkeypatch.setenv("DEVOPS_TEST_TOKEN", fixture_value)
+    assert fixture_value not in redact(f"CLI echoed {fixture_value}")
+    result = SubprocessRunner(tmp_path).run(
+        CommandSpec(["python3", "-c", "import os; print(os.environ['DEVOPS_TEST_TOKEN'])"], "test redaction", False)
+    )
+    assert fixture_value not in result.stdout
+    assert "[REDACTED]" in result.stdout
+
+
 def test_runner_never_interprets_shell_metacharacters(tmp_path: Path) -> None:
     runner = SubprocessRunner(tmp_path)
     marker = tmp_path / "owned"
