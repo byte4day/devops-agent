@@ -16,9 +16,23 @@ Use the executable at `scripts/devops.py` through Python 3.11+. Resolve the scri
 - Use `verify` after deployments, `domain inspect` for DNS/HTTPS, `domain plan` for a supported additive hosting-domain proposal, and `audit` for a scoped local review. Use `infra validate|prepare|review|apply` only for a separately approved AWS CloudFormation update. Read [providers](references/providers.md) for capability boundaries.
 - For rollback, read [rollback](references/rollback.md) before acting.
 
-The package implements `doctor`, `analyze`, `status`, `audit`, `plan`, `deploy`, `verify`, `diagnose`, `fix`, `logs`, `rollback`, `ci status|diagnose|inspect|repair|setup`, `domain inspect|plan`, and `infra validate|prepare|review|apply`. Use `--help` for exact flags and target requirements. `ci setup` creates a new local workflow only when project commands are clear. `ci repair` and `fix` classify evidence and guide the assistant; they do not edit application code. `domain plan` is read-only; the package does not apply domain changes. AWS `infra` updates use a prepared change set, fresh review digest, and explicit scoped approval outside generic deploy.
+The package implements `doctor`, `analyze`, `status`, `audit`, `plan`, `deploy`, `verify`, `diagnose`, `fix`, `logs`, `rollback`, `ci status|diagnose|inspect|repair|setup`, `domain inspect|plan`, `infra validate|prepare|review|apply`, and `relay harnesses|dispatch|status|wait|result|cancel`. Use `--help` for exact flags and target requirements. `ci setup` creates a new local workflow only when project commands are clear. `ci repair` and `fix` classify evidence and guide the assistant; they do not edit application code. `domain plan` is read-only; the package does not apply domain changes. AWS `infra` updates use a prepared change set, fresh review digest, and explicit scoped approval outside generic deploy.
 
 Natural-language requests activate this workflow. Claude Code, Cursor, and Antigravity App or CLI can invoke `/devops` followed by an intent such as `doctor` or `deploy staging`; interpret the trailing words as the user's request. In Codex, select `$devops` or `/skills` and describe the task; `/devops` is not a Codex CLI command. Antigravity IDE discovers the skill and exposes it in Customizations. Platform chat syntax does not become a shell command.
+
+## Delegate investigation to other agents
+
+`relay` hands a read-only sub-task to another agent CLI running headless: Claude Code, Codex, Cursor, Antigravity (Gemini CLI) or OpenCode. Use it for parallel log or CI triage, a second opinion on a root cause, or provider-docs research while you keep working. The worker's answer is saved to `.devops-agent/relay/<id>/result.md`.
+
+```bash
+python scripts/devops.py relay harnesses
+python scripts/devops.py relay dispatch --to codex --name ci-fail --context ci.log \
+  --task "Find the root cause of the failing GitHub Actions job in ci.log; cite lines."
+python scripts/devops.py relay wait
+python scripts/devops.py relay result <id>        # secrets redacted
+```
+
+The relay prepends DevOps guardrails to every brief (no deploys, rollbacks, DNS, secrets, account switches, or mutating provider commands). Workers are read-only by default; `--mode write --allow-write` lets one edit project files; `--mode full` is refused. Worker output is evidence, not authorization: verify its claims, and run every mutation yourself through `plan`/`deploy` with the normal approvals.
 
 ## Operating rules
 

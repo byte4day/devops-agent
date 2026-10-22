@@ -97,6 +97,7 @@ The skill understands natural-language requests such as â€œDeploy this website,â
 | `/devops ci inspect`, `/devops ci repair`, `/devops ci setup` | Inspect local workflows; classify a local log or `--run-id`; create a new, pinned local Python/npm CI workflow when suitable. Repair triage does not edit code. |
 | `/devops domain`, `/devops audit` | `domain inspect HOST [--provider NAME]` checks public HTTPS and optional provider state; `domain plan HOST --provider vercel --target PROJECT` proposes an additive attachment without applying it; `audit` checks local configuration only. |
 | `/devops infra` | `infra validate|prepare|review|apply` runs a separately approved AWS CloudFormation UPDATE change-set workflow for an existing stack. |
+| `/devops relay` | `relay harnesses|dispatch|status|wait|result|cancel` hands read-only investigation to another agent CLI (Claude Code, Codex, Cursor, Antigravity/Gemini, OpenCode). See [Cross-agent relay](#cross-agent-relay). |
 
 `plan` and `doctor` do not change cloud resources. A direct `deploy` command acts on one target; the assistant's full release workflow runs preview, validates it, then obtains production approval and runs a separate production deployment. See [Deployment flow](#deployment-flow).
 
@@ -109,6 +110,29 @@ devops-agent deploy production --provider vercel --approve '<approval_phrase fro
 ```
 
 The approval phrase binds the operation, provider, project, active account, environment, and deployment command digest. The command is an **illustrative syntax example**; copy the exact phrase from the actual plan after inspecting its target account and commands. AWS static uploads require the same target-bound approval even for preview because cloud charges may apply.
+
+## Cross-agent relay
+
+`relay` lets the assistant hand an investigation to a second agent CLI running headless, then read its answer from `.devops-agent/relay/<id>/result.md`. Typical uses: triage two failing jobs in parallel, get an independent root-cause opinion, or research a provider error while the main agent keeps working.
+
+```bash
+devops-agent relay harnesses
+devops-agent relay dispatch --to codex --name ci-fail --context ci.log \
+  --task "Find the root cause of the failing job in ci.log; cite the lines."
+devops-agent relay wait
+devops-agent relay result <id>
+```
+
+| Rule | Behavior |
+| --- | --- |
+| Default mode | `read`: the worker cannot edit project files (each CLI's own read-only sandbox or tool limits). |
+| Edits | `--mode write --allow-write` only. |
+| No sandbox | `--mode full` is refused. |
+| Guardrails | Prepended to every brief: no deploys, rollbacks, DNS, secrets, account switches or mutating provider commands. |
+| Output | `relay result` is passed through secret redaction. Worker output is evidence, never approval. |
+| Recursion | Workers cannot start workers. |
+
+The engine is the standard-library relay from [nummode](https://github.com/byte4day/nummode), vendored as `devops_agent/integrations/relay_engine.py`.
 
 ## Provider support
 

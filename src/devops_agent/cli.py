@@ -71,6 +71,12 @@ def _parser() -> argparse.ArgumentParser:
     domain.add_argument("hostname")
     domain.add_argument("--provider")
     domain.add_argument("--target", help="Existing provider project name for a domain plan")
+    relay = sub.add_parser(
+        "relay",
+        help="Delegate read-only investigation to another agent CLI (claude, codex, cursor, gemini, opencode)",
+        add_help=False,
+    )
+    relay.add_argument("relay_args", nargs=argparse.REMAINDER)
     infra = sub.add_parser("infra", help="Reviewed AWS CloudFormation update workflow")
     infra.add_argument("action", choices=("validate", "prepare", "review", "apply"))
     infra.add_argument("--change-set-name")
@@ -140,6 +146,10 @@ def main(argv: list[str] | None = None) -> int:
     if not root.is_dir():
         _emit({"error": f"Project directory does not exist: {root}"})
         return 2
+    if args.command == "relay":
+        from devops_agent.integrations import relay as relay_cli
+
+        return relay_cli.main(list(args.relay_args), root)
     try:
         providers = all_providers()
         runner = SubprocessRunner(root)
